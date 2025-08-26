@@ -1,5 +1,5 @@
 
-                                       //mobile resposiveness
+
 
 // src/pages/LiveTradesPage.js
 import React, { useState, useEffect } from 'react';
@@ -11,6 +11,8 @@ const LiveTradesPage = () => {
   const [executedTrades, setExecutedTrades] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+  const [selectedTrade, setSelectedTrade] = useState(null);
+  const [showModal, setShowModal] = useState(false);
 
   useEffect(() => {
     const handleResize = () => {
@@ -74,6 +76,12 @@ const LiveTradesPage = () => {
     return format(dt, 'HH:mm:ss');
   };
 
+  const formatDate = (timestamp) => {
+    const dt = parseTimestamp(timestamp);
+    if (!dt) return "-";
+    return format(dt, 'dd MMM yyyy');
+  };
+
   const formatPrice = (price) => {
     if (price === undefined || price === null) return "-";
     return parseFloat(price).toFixed(2);
@@ -100,6 +108,60 @@ const LiveTradesPage = () => {
     if (typeof value === 'number') return value;
     const parsed = parseFloat(value);
     return isNaN(parsed) ? 0.0 : parsed;
+  };
+
+  const showTradeDetails = (trade) => {
+    const symbol = getSymbolName(trade);
+    const symbolTrades = executedTrades.filter(t => getSymbolName(t) === symbol);
+    
+    symbolTrades.sort((a, b) => {
+      const ad = parseTimestamp(a.timestamp)?.getTime() || 0;
+      const bd = parseTimestamp(b.timestamp)?.getTime() || 0;
+      return bd - ad;
+    });
+
+    let totalBuyQty = 0;
+    let totalSellQty = 0;
+    let buyCost = 0;
+    let sellProceeds = 0;
+
+    symbolTrades.forEach(t => {
+      const tType = (t.type || t.transaction_type || "").toString().toUpperCase();
+      const qty = toDouble(t.filled_qty || t.filled_quantity || t.qty || t.quantity);
+      const price = toDouble(t.avg_price || t.average_price || t.price || t.Price);
+
+      if (tType === "BUY") {
+        totalBuyQty += qty;
+        buyCost += price * qty;
+      } else if (tType === "SELL") {
+        totalSellQty += qty;
+        sellProceeds += price * qty;
+      }
+    });
+
+    const matchedQty = Math.min(totalBuyQty, totalSellQty);
+    const avgBuy = totalBuyQty > 0 ? buyCost / totalBuyQty : 0.0;
+    const avgSell = totalSellQty > 0 ? sellProceeds / totalSellQty : 0.0;
+    const realizedPnL = matchedQty * (avgSell - avgBuy);
+
+    setSelectedTrade({
+      trade,
+      symbol,
+      symbolTrades,
+      totalBuyQty,
+      totalSellQty,
+      buyCost,
+      sellProceeds,
+      avgBuy,
+      avgSell,
+      realizedPnL
+    });
+    setShowModal(true);
+  };
+
+  const closeModal = () => {
+    setShowModal(false);
+    setTimeout(() => setSelectedTrade(null), 300);
   };
 
   const TradeItem = ({ trade, index }) => {
@@ -223,7 +285,6 @@ const LiveTradesPage = () => {
               alignItems: 'center',
               justifyContent: isMobile ? 'flex-end' : 'flex-end',
               gap: '8px',
-              marginBottom: isMobile ? '0' : '4px'
             }}>
               <span style={{ 
                 color: '#6c757d', 
@@ -250,7 +311,8 @@ const LiveTradesPage = () => {
               <div style={{ 
                 color: '#6c757d', 
                 fontSize: '11px',
-                fontWeight: '600'
+                fontWeight: '600',
+                marginTop: '4px'
               }}>
                 {orderType} {validity}
               </div>
@@ -273,41 +335,236 @@ const LiveTradesPage = () => {
     );
   };
 
-  const showTradeDetails = (trade) => {
-    const symbol = getSymbolName(trade);
-    const symbolTrades = executedTrades.filter(t => getSymbolName(t) === symbol);
-    
-    symbolTrades.sort((a, b) => {
-      const ad = parseTimestamp(a.timestamp)?.getTime() || 0;
-      const bd = parseTimestamp(b.timestamp)?.getTime() || 0;
-      return bd - ad;
-    });
+  const TradeModal = () => {
+    if (!selectedTrade) return null;
 
-    let totalBuyQty = 0;
-    let totalSellQty = 0;
-    let buyCost = 0;
-    let sellProceeds = 0;
+    const { trade, symbol, totalBuyQty, totalSellQty, avgBuy, avgSell, realizedPnL } = selectedTrade;
+    const type = (trade.type || trade.transaction_type || "-").toString().toUpperCase();
+    const isBuy = type === "BUY";
+    const pnlPositive = realizedPnL >= 0;
 
-    symbolTrades.forEach(t => {
-      const tType = (t.type || t.transaction_type || "").toString().toUpperCase();
-      const qty = toDouble(t.filled_qty || t.filled_quantity || t.qty || t.quantity);
-      const price = toDouble(t.avg_price || t.average_price || t.price || t.Price);
+    return (
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        backgroundColor: 'rgba(0, 0, 0, 0.7)',
+        backdropFilter: 'blur(5px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 1000,
+        padding: isMobile ? '16px' : '0',
+        opacity: showModal ? 1 : 0,
+        transition: 'opacity 0.3s ease',
+        pointerEvents: showModal ? 'auto' : 'none'
+      }} onClick={closeModal}>
+        <div style={{
+          background: 'linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(245, 247, 250, 0.95) 100%)',
+          backdropFilter: 'blur(20px)',
+          borderRadius: '24px',
+          padding: isMobile ? '20px' : '30px',
+          width: isMobile ? '100%' : '90%',
+          maxWidth: '600px',
+          maxHeight: isMobile ? '80vh' : '90vh',
+          overflow: 'auto',
+          boxShadow: '0 25px 50px rgba(0, 0, 0, 0.25)',
+          border: '1px solid rgba(255, 255, 255, 0.3)',
+          transform: showModal ? 'scale(1)' : 'scale(0.9)',
+          transition: 'transform 0.3s ease',
+          position: 'relative'
+        }} onClick={(e) => e.stopPropagation()}>
+          {/* Close button */}
+          <button onClick={closeModal} style={{
+            position: 'absolute',
+            top: '15px',
+            right: '15px',
+            background: 'rgba(0, 0, 0, 0.05)',
+            border: 'none',
+            borderRadius: '50%',
+            width: '40px',
+            height: '40px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            cursor: 'pointer',
+            fontSize: '20px',
+            fontWeight: 'bold',
+            color: '#6c757d',
+            transition: 'all 0.2s ease'
+          }} onMouseOver={(e) => {
+            e.target.style.background = 'rgba(0, 0, 0, 0.1)';
+            e.target.style.color = '#2c3e50';
+          }} onMouseOut={(e) => {
+            e.target.style.background = 'rgba(0, 0, 0, 0.05)';
+            e.target.style.color = '#6c757d';
+          }}>
+            ×
+          </button>
 
-      if (tType === "BUY") {
-        totalBuyQty += qty;
-        buyCost += price * qty;
-      } else if (tType === "SELL") {
-        totalSellQty += qty;
-        sellProceeds += price * qty;
-      }
-    });
+          {/* Header */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            marginBottom: '20px',
+            paddingRight: '40px'
+          }}>
+            <div style={{
+              padding: '8px 16px',
+              background: isBuy ? 
+                'linear-gradient(135deg, rgba(0, 122, 255, 0.15) 0%, rgba(0, 122, 255, 0.05) 100%)' : 
+                'linear-gradient(135deg, rgba(255, 59, 48, 0.15) 0%, rgba(255, 59, 48, 0.05) 100%)',
+              border: isBuy ? 
+                '1px solid rgba(0, 122, 255, 0.2)' : 
+                '1px solid rgba(255, 59, 48, 0.2)',
+              borderRadius: '12px',
+              marginRight: '15px'
+            }}>
+              <span style={{
+                color: isBuy ? '#007AFF' : '#FF3B30',
+                fontWeight: '700',
+                fontSize: '14px'
+              }}>{type}</span>
+            </div>
+            <h2 style={{
+              color: '#2c3e50',
+              fontSize: isMobile ? '20px' : '24px',
+              fontWeight: '700',
+              margin: 0
+            }}>{symbol}</h2>
+          </div>
 
-    const matchedQty = Math.min(totalBuyQty, totalSellQty);
-    const avgBuy = totalBuyQty > 0 ? buyCost / totalBuyQty : 0.0;
-    const avgSell = totalSellQty > 0 ? sellProceeds / totalSellQty : 0.0;
-    const realizedPnL = matchedQty * (avgSell - avgBuy);
+          {/* Trade Details */}
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.6)',
+            borderRadius: '16px',
+            padding: '20px',
+            marginBottom: '25px',
+            border: '1px solid rgba(255, 255, 255, 0.5)'
+          }}>
+            <h3 style={{
+              color: '#2c3e50',
+              fontSize: '16px',
+              fontWeight: '700',
+              marginTop: 0,
+              marginBottom: '15px'
+            }}>Trade Details</h3>
+            
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+              gap: '12px'
+            }}>
+              <div>
+                <div style={{ color: '#6c757d', fontSize: '13px', marginBottom: '4px' }}>Quantity</div>
+                <div style={{ color: '#2c3e50', fontWeight: '600' }}>
+                  {trade.filled_qty || trade.filled_quantity || trade.qty || 0} / {trade.qty || trade.quantity || 0}
+                </div>
+              </div>
+              <div>
+                <div style={{ color: '#6c757d', fontSize: '13px', marginBottom: '4px' }}>Price</div>
+                <div style={{ color: '#2c3e50', fontWeight: '600' }}>
+                  ₹{formatPrice(trade.avg_price || trade.average_price || trade.price || trade.Price)}
+                </div>
+              </div>
+              <div>
+                <div style={{ color: '#6c757d', fontSize: '13px', marginBottom: '4px' }}>Exchange</div>
+                <div style={{ color: '#2c3e50', fontWeight: '600' }}>
+                  {trade.exchange || trade.Exchange || "NSE"}
+                </div>
+              </div>
+              <div>
+                <div style={{ color: '#6c757d', fontSize: '13px', marginBottom: '4px' }}>Status</div>
+                <div style={{ 
+                  color: '#34C759', 
+                  fontWeight: '600',
+                  display: 'inline-block',
+                  padding: '3px 8px',
+                  background: 'rgba(52, 199, 89, 0.1)',
+                  borderRadius: '8px',
+                  fontSize: '12px'
+                }}>
+                  {trade.status || trade.Status || "COMPLETE"}
+                </div>
+              </div>
+              <div>
+                <div style={{ color: '#6c757d', fontSize: '13px', marginBottom: '4px' }}>Time</div>
+                <div style={{ color: '#2c3e50', fontWeight: '600' }}>
+                  {formatTime(trade.timestamp)}
+                </div>
+              </div>
+              <div>
+                <div style={{ color: '#6c757d', fontSize: '13px', marginBottom: '4px' }}>Date</div>
+                <div style={{ color: '#2c3e50', fontWeight: '600' }}>
+                  {formatDate(trade.timestamp)}
+                </div>
+              </div>
+            </div>
+          </div>
 
-    alert(`Trade details for ${symbol}\nRealized P&L: ₹${realizedPnL.toFixed(2)}`);
+          {/* Performance Summary */}
+          <div style={{
+            background: 'rgba(255, 255, 255, 0.6)',
+            borderRadius: '16px',
+            padding: '20px',
+            border: '1px solid rgba(255, 255, 255, 0.5)'
+          }}>
+            <h3 style={{
+              color: '#2c3e50',
+              fontSize: '16px',
+              fontWeight: '700',
+              marginTop: 0,
+              marginBottom: '15px'
+            }}>Performance Summary</h3>
+            
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr',
+              gap: '15px'
+            }}>
+              <div>
+                <div style={{ color: '#6c757d', fontSize: '13px', marginBottom: '4px' }}>Total Buy Qty</div>
+                <div style={{ color: '#2c3e50', fontWeight: '600' }}>{totalBuyQty}</div>
+              </div>
+              <div>
+                <div style={{ color: '#6c757d', fontSize: '13px', marginBottom: '4px' }}>Total Sell Qty</div>
+                <div style={{ color: '#2c3e50', fontWeight: '600' }}>{totalSellQty}</div>
+              </div>
+              <div>
+                <div style={{ color: '#6c757d', fontSize: '13px', marginBottom: '4px' }}>Avg Buy Price</div>
+                <div style={{ color: '#2c3e50', fontWeight: '600' }}>₹{avgBuy.toFixed(2)}</div>
+              </div>
+              <div>
+                <div style={{ color: '#6c757d', fontSize: '13px', marginBottom: '4px' }}>Avg Sell Price</div>
+                <div style={{ color: '#2c3e50', fontWeight: '600' }}>₹{avgSell.toFixed(2)}</div>
+              </div>
+            </div>
+            
+            <div style={{
+              marginTop: '20px',
+              padding: '15px',
+              background: pnlPositive ? 
+                'linear-gradient(135deg, rgba(52, 199, 89, 0.1) 0%, rgba(52, 199, 89, 0.05) 100%)' : 
+                'linear-gradient(135deg, rgba(255, 59, 48, 0.1) 0%, rgba(255, 59, 48, 0.05) 100%)',
+              borderRadius: '12px',
+              border: pnlPositive ? 
+                '1px solid rgba(52, 199, 89, 0.2)' : 
+                '1px solid rgba(255, 59, 48, 0.2)',
+              textAlign: 'center'
+            }}>
+              <div style={{ color: '#6c757d', fontSize: '14px', marginBottom: '5px' }}>Realized P&L</div>
+              <div style={{ 
+                color: pnlPositive ? '#34C759' : '#FF3B30', 
+                fontSize: '20px',
+                fontWeight: '800'
+              }}>₹{realizedPnL.toFixed(2)}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   const TradesList = () => {
@@ -373,7 +630,8 @@ const LiveTradesPage = () => {
       maxWidth: 1200, 
       margin: "0 auto",
       background: "linear-gradient(135deg, #f5f7fa 0%, #e4e8f0 100%)",
-      minHeight: "100vh"
+      minHeight: "100vh",
+      position: 'relative'
     }}>
       {/* Header */}
       <div
@@ -440,6 +698,9 @@ const LiveTradesPage = () => {
           <TradesList />
         </div>
       )}
+
+      {/* Trade Modal */}
+      <TradeModal />
 
       <style>{`
         @keyframes slideInUp {

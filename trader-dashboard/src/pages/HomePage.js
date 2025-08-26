@@ -1,12 +1,5 @@
 
 
-
-
-
-
-
-
-
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { TrendingUp, Shield, PieChart, DollarSign, ArrowRight, Zap, Globe, BarChart3, Star } from "lucide-react";

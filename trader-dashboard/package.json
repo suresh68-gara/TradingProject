@@ -9,6 +9,7 @@
     "@mui/icons-material": "^7.3.1",
     "@mui/material": "^7.3.1",
     "@mui/system": "^7.3.1",
+    "@tsparticles/react": "^3.0.0",
     "concurrently": "^9.2.0",
     "date-fns": "^4.1.0",
     "firebase": "^12.1.0",
@@ -22,6 +23,7 @@
     "react-scripts": "^5.0.1",
     "recharts": "^3.1.2",
     "three": "^0.179.1",
+    "tsparticles": "^3.9.1",
     "web-vitals": "^5.1.0"
   },
   "scripts": {

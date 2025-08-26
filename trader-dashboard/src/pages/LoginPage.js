@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import {
   TrendingUp,
@@ -10,6 +11,7 @@ import {
   Target,
   ArrowUpRight,
   ArrowDownRight,
+
   Coins,
   CandlestickChart,
   X,
@@ -350,13 +352,13 @@ const LoginPage = () => {
         <div className="bg-black/80 backdrop-blur-xl border border-blue-500/30 rounded-2xl p-6 md:p-8 shadow-2xl relative overflow-hidden transform transition-all duration-500 hover:border-blue-500/50">
           <div className="absolute inset-0 bg-gradient-to-r from-blue-600/20 via-transparent to-blue-600/20 rounded-2xl" />
           <div className="text-center mb-6 md:mb-8 relative z-10">
-            <div className="flex justify-center items-center space-x-3 mb-4">
-              <div className="p-3 bg-blue-600/20 rounded-full border border-blue-500/30 animate-pulse-slow">
-                <TrendingUp className="text-blue-400" size={28} />
-              </div>
-              <div className="p-2 bg-blue-600/10 rounded-full border border-blue-500/20 animate-ping-slow">
-                <BarChart3 className="text-blue-300" size={20} />
-              </div>
+            {/* Logo Added Here */}
+            <div className="flex justify-center mb-4">
+              <img 
+                src="/Logo2.jpg" 
+                alt="Vunathi Capital Logo" 
+                className="w-16 h-16 rounded-full border-2 border-blue-500/30 shadow-lg" 
+              />
             </div>
             <h1 className="text-2xl md:text-3xl font-bold text-white mb-2">
               Vunathi <span className="text-blue-400 animate-pulse-text">Capital</span>
